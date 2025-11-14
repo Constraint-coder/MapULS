@@ -1,44 +1,47 @@
 <template>
-  <div class="bg-white p-6 rounded-lg shadow-lg space-y-6 z-[1000]">
+  <div class="w-90 p-0 overflow-x-auto border border-blue-500">
     <h2 class="text-2xl font-bold text-center text-gray-800">🏢 Gestión de Pisos</h2>
 
     <!-- Formulario -->
     <form @submit.prevent="guardarPiso" class="space-y-4">
-      <div>
-        <label class="block font-medium text-gray-700 mb-1">Nombre del piso:</label>
-        <input
-          v-model="form.nombres"
-          type="text"
-          class="input"
-          placeholder="Ej: Piso 1"
-          required
-        />
-      </div>
+      <vs-input
+      class="w-auto "
+        v-model="form.nombres"
+        label="Nombre del piso"
+        placeholder="Ej: Piso 1"
+        required
+      />
 
-      <button type="submit" class="btn-primary w-full">
+      <vs-button block color="success" >
         {{ editandoId ? 'Actualizar' : 'Agregar' }} Piso
-      </button>
+      </vs-button>
     </form>
 
     <!-- Lista de pisos -->
     <div>
       <h3 class="text-lg font-semibold text-gray-700 mb-2">📋 Lista de Pisos</h3>
-      <ul class="space-y-2">
-        <li
-          v-for="piso in pisos"
-          :key="piso.id"
-          class="flex justify-between items-center bg-gray-100 p-3 rounded-md shadow-sm"
-        >
-          <span class="text-gray-800 font-medium">{{ piso.nombres }}</span>
-          <div class="space-x-2">
-            <button @click="cargarEdicion(piso)" class="text-blue-600 hover:underline">Editar</button>
-            <button @click="eliminar(piso.id)" class="text-red-600 hover:underline">Eliminar</button>
-          </div>
-        </li>
-      </ul>
+      <vs-table  :data="pisos">
+        <template  #thead>
+          <vs-tr>
+            <vs-th>Nombre</vs-th>
+            <vs-th>Acciones</vs-th>
+          </vs-tr>
+        </template>
+
+        <template #tbody>
+          <vs-tr v-for="piso in pisos" :key="piso.id">
+            <vs-td>{{ piso.nombres }}</vs-td>
+            <vs-td>
+              <vs-button color="warning" small @click="cargarEdicion(piso)">Editar</vs-button>
+              <vs-button color="danger" small @click="eliminar(piso.id)">Eliminar</vs-button>
+            </vs-td>
+          </vs-tr>
+        </template>
+      </vs-table>
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue'

@@ -1,52 +1,65 @@
 <template>
   <div>
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-bold">Listado de Materias</h2>
 
-              <!-- Botón Custom Map -->
-        <button
-          class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-          @click="irACustomMap"
-        >
+    <!-- ENCABEZADO usando Vuesax Alpha -->
+     <div class="flex gap-4 mb-6">
+      <!-- Botón Cerrar Sesión (izquierda) -->
+     
+        <vs-button class="m-2" color="danger" :loading="loading" @click="cerrarSesion">
+          {{ loading ? 'Cerrando...' : 'Cerrar Sesión' }}
+        </vs-button>
+    
+
+      <!-- Título (centrado) -->
+   
+        <h2 class="text-xl font-bold text-center">Listado de Materias</h2>
+    
+
+      <!-- Botón Custom Map (derecha) -->
+      
+        <vs-button class="fixed right-4 " color="success" @click="irACustomMap">
           Custom Map
-        </button>
-
-      <!-- Botón Cerrar Sesión -->
-      <button
-        class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-        @click="cerrarSesion"
-        :disabled="loading"
-      >
-        {{ loading ? 'Cerrando...' : 'Cerrar Sesión' }}
-      </button>
+        </vs-button>
+   
     </div>
 
-    <section class="section">
-      <table class="table-auto border-collapse border border-gray-300 w-full">
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="border border-gray-300 px-4 py-2">Materia</th>
-            <th class="border border-gray-300 px-4 py-2">Horario</th>
-            <th class="border border-gray-300 px-4 py-2">Aula</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in datos" :key="item.id" class="hover:bg-gray-100">
-            <td class="border border-gray-300 px-4 py-2">{{ item.materia }}</td>
-            <td class="border border-gray-300 px-4 py-2">{{ item.horario }}</td>
-            <td class="border border-gray-300 px-4 py-2">
-              <a href="#" class="text-blue-600 hover:underline cursor-pointer"
-                 @click.prevent="seleccionarDestino(item.aula)">
-                {{ item.aula }}
-              </a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-if="datos.length === 0" class="mt-2">No hay materias disponibles.</p>
-    </section>
+    <!-- TABLA -->
+    <vs-table :data="datos">
+      <template #thead>
+        <vs-tr>
+          <vs-th>Materia</vs-th>
+          <vs-th>Horario</vs-th>
+          <vs-th>Aula</vs-th>
+        </vs-tr>
+      </template>
+
+      <template #tbody>
+        <vs-tr v-for="item in datos" :key="item.id">
+          <vs-td>{{ item.materia }}</vs-td>
+          <vs-td>{{ item.horario }}</vs-td>
+          <vs-td>
+            <vs-button
+              type="flat"
+              color="primary"
+              class="underline cursor-pointer"
+              @click="seleccionarDestino(item.aula)"
+            >
+              {{ item.aula }}
+            </vs-button>
+          </vs-td>
+        </vs-tr>
+      </template>
+    </vs-table>
+
+    <p v-if="datos.length === 0" class="mt-2 text-gray-600">
+      No hay materias disponibles.
+    </p>
+
   </div>
 </template>
+
+
+
 
 <script setup>
 import { ref, onMounted } from 'vue'

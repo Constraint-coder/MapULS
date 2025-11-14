@@ -1,19 +1,28 @@
 <template>
-  <aside  class="mt-6 bg-white rounded-lg shadow-lg p-6 fixed top-10 right-4 z-[1000] w-auto max-w-full">
+<aside
+  class="mt-6 bg-white rounded-lg shadow-lg p-2 fixed top-10 right-4 z-[1000]
+         w-20% max-w-full md:max-w-10% md:text-sm sm:max-w-5%
+         max-h-[80vh]        <!-- altura máxima 80% -->
+         overflow-y-auto      <!-- scroll vertical -->
+         overflow-x-hidden    <!-- sin scroll horizontal -->
+  "
+>
+
     <!-- 🔹 Título clickable -->
     <button
       @click="mostrarPanel = !mostrarPanel"
-       class="w-20 md:w-full text-center text-sm md:text-sm font-bold text-gray-800 hover:text-blue-400 transition px-[1px] py-[1px] h-0 md:h-2">
+      class="w-20 md:w-auto text-center text-sm md:text-sm font-bold text-gray-800 hover:text-blue-400 transition">
       📋 Panel Administración
     </button>
 
     <!-- 🔻 Contenido colapsable -->
     <transition name="fade">
       <div v-if="mostrarPanel" class="mt-6 space-y-3">
-        <button @click="toggle('destino')" class="btn">📍 Destino</button>
-        <button @click="toggle('pasillos')" class="btn">🛣️ Pasillos</button>
-        <button @click="toggle('referencia')" class="btn">📌 Referencia</button>
-        <button @click="toggle('pisos')" class="btn">🏢 Pisos</button>
+      <vs-button block color="dark" @click="toggle('destino')">📍 Destino</vs-button>
+      <vs-button block  color="success" @click="toggle('pasillos')">🛣️ Pasillos</vs-button>
+      <vs-button block color="warn" @click="toggle('referencia')">📌 Referencia</vs-button>
+      <vs-button block color="danger" @click="toggle('pisos')">🏢 Pisos</vs-button>
+      <vs-button block color="dark" @click="toggle('materias')">📕 Materias</vs-button>
 
         <!-- Formularios -->
         <div class="mt-6 space-y-6">
@@ -21,11 +30,13 @@
           <Pasillos v-if="visibleForm === 'pasillos'" />
           <Referencia v-if="visibleForm === 'referencia'" />
           <Pisos v-if="visibleForm === 'pisos'" />
+           <Materias v-if="visibleForm === 'materias'" />
         </div>
       </div>
     </transition>
   </aside>
 </template>
+
 
 <script setup>
 import { ref } from 'vue'
@@ -33,6 +44,7 @@ import Destino from './destino.vue'
 import Pasillos from './pasillos.vue'
 import Referencia from './referencia.vue'
 import Pisos from './pisos.vue'
+import Materias from './materias.vue'
 
 const mostrarPanel = ref(false)
 const visibleForm = ref(null)

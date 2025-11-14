@@ -1,71 +1,134 @@
 <template>
-  <form @submit.prevent="guardarReferencia" class="space-y-4 p-4 max-w-lg mx-auto">
-    <h2 class="text-xl font-semibold text-center">Registrar Referencia</h2>
+  <div class="p-6 overflow-x-auto border border-blue-500" >
 
-    <!-- NOMBRE -->
-    <div>
-      <label class="block font-medium mb-1">Nombre:</label>
-      <input
-        v-model="form.nombres"
-        type="text"
-        class="border p-2 w-full rounded"
-        placeholder="Ejemplo: Escalera Norte"
-        required
-      />
+    <!-- BOTONES SUPERIORES -->
+    <div class="flex gap-4 mb-6">
+       <vs-button block  color="success"
+        @click="mostrarFormulario = true; mostrarTabla = false; resetForm()">
+        Registrar Referencia
+       </vs-button>
+        
+
+      <vs-button block  color="dark"
+        @click="cargarReferencias(); mostrarFormulario = false; mostrarTabla = true">
+        Listar Referencias
+       </vs-button>
     </div>
 
-    <!-- PISO -->
-    <div>
-      <label class="block font-medium mb-1">Piso:</label>
-      <select
-        v-model="form.id_pisos"
-        class="border p-2 w-full rounded"
-        required
-      >
-        <option disabled value="">Selecciona un piso</option>
-        <option v-for="piso in pisos" :key="piso.id" :value="piso.id">
-          {{ piso.nombres }}
-        </option>
-      </select>
-    </div>
+    <!-- ========================== -->
+    <!-- FORMULARIO DE REGISTRO -->
+    <!-- ========================== -->
+    <div v-if="mostrarFormulario">
+      <form @submit.prevent="guardarReferencia" class="space-y-4 p-4 max-w-lg mx-auto">
+        <h2 class="text-xl font-semibold text-center">
+          {{ editMode ? "Editar Referencia" : "Registrar Referencia" }}
+        </h2>
 
-    <!-- COORDENADAS -->
-    <div>
-      <h3 class="font-semibold mb-2">Coordenadas</h3>
-
-        <input
-          v-model="form.coordenadas"
-          type="text"
-          placeholder="Ej: 13.692790,-89.191680"
-          class="border p-2 rounded flex-1"
+        <!-- NOMBRE -->
+             
+           <vs-input
+          v-model="form.nombres"
+          label="Nombre"
+          placeholder="Ejemplo: Escalera Norte"
           required
         />
-  
-     
+        
+        <!-- PISO -->
+        <vs-select
+          v-model="form.id_pisos"
+          label="Piso"
+          placeholder="Selecciona un piso"
+          required
+        >
+          <vs-option
+            v-for="piso in pisos"
+            :key="piso.id"
+            :value="piso.id"
+          >
+            {{ piso.nombres }}
+          </vs-option>
+        </vs-select>
 
+        <!-- COORDENADAS -->
+        <vs-input
+          v-model="form.coordenadas"
+          label="Coordenadas"
+          placeholder="Ej: 13.692790,-89.191680"
+          required
+        />
+
+        <!-- BOTÓN -->
+      
+           <vs-button block  color="success"
+                     
+            @click="guardarReferencia"
+          >
+            {{ editMode ? "Actualizar" : "Guardar" }}
+           </vs-button>
+          <button
+            v-if="editMode"
+            type="button"
+            @click="resetForm(); mostrarFormulario = false"
+            class="bg-gray-500 text-white px-4 py-2 rounded w-full"
+          >
+            Cancelar
+          </button>
+       
+      </form>
     </div>
 
-    <!-- BOTÓN -->
-    <button
-      type="submit"
-      class="bg-green-600 text-white px-4 py-2 rounded w-full"
-    >
-      Guardar Referencia
-    </button>
-  </form>
+    <!-- ========================== -->
+    <!-- TABLA / LISTADO DE REFERENCIAS -->
+    <!-- ========================== -->
+    <div v-if="mostrarTabla">
+      <h2 class="text-xl font-semibold mb-4">Lista de Referencias</h2>
+
+<vs-table :data="referencias">
+          <template #thead>
+            <vs-tr>
+              <vs-th>Nombre</vs-th>
+              <vs-th>Piso</vs-th>
+              <vs-th>Coordenadas</vs-th>
+              <vs-th>Acciones</vs-th>
+            </vs-tr>
+          </template>
+
+          <template #tbody>
+            <vs-tr v-for="ref in referencias" :key="ref.id">
+              <vs-td>{{ ref.nombres }}</vs-td>
+              <vs-td>{{ ref.piso?.nombres ?? '—' }}</vs-td>
+              <vs-td>{{ Array.isArray(ref.coordenadas) ? ref.coordenadas.join(', ') : '—' }}</vs-td>
+              <vs-td>
+                <vs-td>
+              <vs-button color="warning" small @click="editar(ref)">Editar</vs-button>
+              <vs-button color="danger" small @click="confirmarEliminar(ref.id)">Eliminar</vs-button>
+            </vs-td>
+              </vs-td>
+            </vs-tr>
+          </template>
+        </vs-table>
+    </div>
+
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getPisos } from '../services/pisosServices'
-import { crearReferencia } from '@/services/puntoServices'
+import { getPisos } from '@/services/pisosServices'
+import { getReferencia, crearReferencia, editarReferencia, eliminarReferencia } from '@/services/puntoServices'
 
 const pisos = ref([])
+const referencias = ref([])
+
+const mostrarFormulario = ref(true)
+const mostrarTabla = ref(false)
+const editMode = ref(false)
+const editandoId = ref(null)
 
 const form = ref({
   nombres: '',
   id_pisos: '',
-  coordenadas: '' // formato texto "lat,lng"
+  coordenadas: ''
 })
 
 onMounted(async () => {
@@ -76,47 +139,91 @@ onMounted(async () => {
   }
 })
 
+// ============================
+// CARGAR LISTA DE REFERENCIAS
+// ============================
+const cargarReferencias = async () => {
+  referencias.value = await getReferencia()
+}
 
-
-// === GUARDAR REFERENCIA ===
+// ============================
+// GUARDAR / EDITAR REFERENCIA
+// ============================
 const guardarReferencia = async () => {
-  try {    // 🔹 Convertir "13.692790,-89.191680" → [13.692790, -89.191680]
+  try {
     const coordsTransformadas = form.value.coordenadas
       .trim()
       .split(',')
       .map(Number)
 
-    // Validación de formato correcto
     if (coordsTransformadas.length !== 2 || coordsTransformadas.some(isNaN)) {
       alert('Formato de coordenadas inválido. Usa: latitud,longitud')
       return
     }
 
     const payload = {
-      nombres: form.value.nombres,
+      nombres: form.value.nombres.trim(),
       id_pisos: form.value.id_pisos,
-      coordenadas: coordsTransformadas // solo una coordenada [lat, lng]
+      coordenadas: coordsTransformadas
     }
 
-    console.log('📤 Enviando a API:', payload)
-    const response = await crearReferencia(payload)
-    console.log('✅ Referencia creada:', response)
+    if (editMode.value) {
+      await editarReferencia(editandoId.value, payload)
+      alert('Referencia actualizada correctamente')
+    } else {
+      await crearReferencia(payload)
+      alert('Referencia guardada correctamente')
+    }
 
-    alert('Referencia guardada correctamente')
+    resetForm()
+    cargarReferencias()
+    mostrarFormulario.value = false
+    mostrarTabla.value = true
 
-    // 🔄 Reiniciar formulario
-    form.value = { nombres: '', id_pisos: '', coordenadas:'' }
   } catch (error) {
-    console.error('❌ Error al guardar referencia:', error)
+    console.error('Error al guardar referencia:', error)
     alert('Error al guardar la referencia')
   }
+}
+
+// ============================
+// CARGAR DATOS EN FORM AL EDITAR
+// ============================
+const editar = (refObj) => {
+  editMode.value = true
+  editandoId.value = refObj.id
+  form.value = {
+    nombres: refObj.nombres,
+    id_pisos: refObj.id_pisos,
+    coordenadas: refObj.coordenadas.join(',')
+  }
+
+  mostrarFormulario.value = true
+  mostrarTabla.value = false
+}
+
+// ============================
+// CONFIRMAR ELIMINACIÓN
+// ============================
+const confirmarEliminar = async (id) => {
+  if (confirm('¿Seguro que deseas eliminar esta referencia?')) {
+    await eliminarReferencia(id)
+    cargarReferencias()
+  }
+}
+
+// ============================
+// RESET FORM
+// ============================
+const resetForm = () => {
+  form.value = { nombres: '', id_pisos: '', coordenadas: '' }
+  editMode.value = false
+  editandoId.value = null
 }
 </script>
 
 <style scoped>
-form {
-  background: #f9fafb;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+table {
+  background: white;
 }
 </style>

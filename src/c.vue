@@ -130,6 +130,16 @@ function distancia(a, b) {
   const x = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
 }
+// Interpolar todos los segmentos de un pasillo
+function interpolarSegmentoPasillo(pasillo) {
+  const nodos = []
+  for (let i = 0; i < pasillo.coordenadas.length - 1; i++) {
+    const inter = interpolarSegmento(pasillo.coordenadas[i], pasillo.coordenadas[i + 1])
+    if (i > 0) inter.shift() // evitar duplicar nodos
+    nodos.push(...inter)
+  }
+  return nodos
+}
 
 function interpolarSegmento(a,b){
   const nodos = [], pasos = Math.max(1, Math.ceil(distancia(a,b)/0.5))
@@ -216,139 +226,82 @@ function iniciarGeolocalizacion(){
 }
 
 // ====== Calcular ruta ======
+// ====== Calcular ruta ======
 async function onDestinoChange() {
   rutasPisos.value = []
   logPasillosUsados.value = []
-  indicaciones.value = [] // 🧭 limpiar lista de pasos
+  indicaciones.value = []
   marcadoresReferencia.forEach(m => map.removeLayer(m))
   marcadoresReferencia = []
 
   if (!pisoSeleccionado.value) { alert("Selecciona tu piso actual"); return }
-  if (!origenCoords.value) { alert("Esperando ubicación actual..., espera aque el mapa cargue"); return }
+  if (!origenCoords.value) { alert("Esperando ubicación actual..."); return }
 
   try {
     const destino = await getDestinoById(destinoSeleccionado.value)
     if (!destino) { alert("Destino no encontrado"); return }
 
-    const pisoActual = parseInt(pisoSeleccionado.value)
-    const paso = pisoActual < destino.id_pisos ? 1 : -1
-    for (let p = pisoActual; p !== destino.id_pisos + paso; p += paso) rutasPisos.value.push(p)
+    // 🚀 Construir nodos interpolados de todos los pasillos
+    const laberintos = pasillos.value.map(p => ({
+      ...p,
+      coordenadas: interpolarSegmentoPasillo(p)
+    }))
 
-    if (marcadorDestino) map.removeLayer(marcadorDestino)
-    marcadorDestino = L.marker(destino.coordenadas).addTo(map).bindPopup(`🏠 ${destino.nombres}`).openPopup()
+    // 🔹 Grafo global
+    const grafoGlobal = construirGrafo(laberintos)
 
+    // 🔹 Nodo inicio: el más cercano a tu ubicación
+    const todosNodos = laberintos.flatMap(p => p.coordenadas)
+    const nodoInicio = todosNodos.reduce((a, b) =>
+      distancia(a, origenCoords.value) < distancia(b, origenCoords.value) ? a : b
+    )
+
+    // 🔹 Nodo final: el más cercano al destino
+    const nodoFinal = todosNodos.reduce((a, b) =>
+      distancia(a, destino.coordenadas) < distancia(b, destino.coordenadas) ? a : b
+    )
+
+    const keyIni = nodoInicio.map(x => x.toFixed(7)).join(",")
+    const keyFin = nodoFinal.map(x => x.toFixed(7)).join(",")
+    const ruta = encontrarCaminoMasCorto(grafoGlobal, keyIni, keyFin)
+
+    if (ruta.camino.length === 0) { alert("No se pudo calcular ruta"); return }
+
+    // 🔹 Dibujar ruta global
     rutasDibujadas.forEach(r => map.removeLayer(r))
     rutasDibujadas = []
 
-    if (rutaSinPasillo.value) {
-      map.removeLayer(rutaSinPasillo.value)
-      rutaSinPasillo.value = null
-    }
+    const rutaCoords = ruta.camino.map(k => k.split(",").map(Number))
+    const poly = L.polyline(rutaCoords, { color: "#007bff", weight: GROSOR_PASILLOS, opacity: 0.9 }).addTo(map)
+    rutasDibujadas.push(poly)
 
-    const coloresPorPiso = { 1: "#007bff", 2: "#ff0000", 3: "#00cc44", 4: "#ffcc00" }
-    let origen = origenCoords.value
-    let rutaGlobal = []
-
-    for (let i = 0; i < rutasPisos.value.length; i++) {
-      const piso = rutasPisos.value[i]
-      const pasillosPiso = pasillos.value.filter(p => p.id_pisos === piso)
-      const laberinto = generarNodosPasillos(pasillosPiso)
-      const grafo = construirGrafo(laberinto)
-      const nodos = laberinto.flatMap(p => p.coordenadas)
-
-      const nodoInicio = nodos.reduce((a, b) => distancia(a, origen) < distancia(b, origen) ? a : b)
-      let nodoFinal
-
-      if (i === rutasPisos.value.length - 1) {
-        nodoFinal = nodos.reduce((a, b) => distancia(a, destino.coordenadas) < distancia(b, destino.coordenadas) ? a : b)
-      } else {
-        const pisoSig = rutasPisos.value[i + 1]
-        const pasillosSig = pasillos.value.filter(p => p.id_pisos === pisoSig)
-        const nodosSig = generarNodosPasillos(pasillosSig).flatMap(p => p.coordenadas)
-        nodoFinal = nodos.reduce((a, b) => {
-          const dA = nodosSig.reduce((min, nS) => Math.min(min, distancia(a, nS)), Infinity)
-          const dB = nodosSig.reduce((min, nS) => Math.min(min, distancia(b, nS)), Infinity)
-          return dA < dB ? a : b
-        })
-      }
-
-      const keyIni = nodoInicio.map(x => x.toFixed(7)).join(",")
-      const keyFin = nodoFinal.map(x => x.toFixed(7)).join(",")
-      const ruta = encontrarCaminoMasCorto(grafo, keyIni, keyFin)
-
-      if (ruta.camino.length > 0) {
-        const rutaCoords = ruta.camino.map(k => k.split(",").map(Number))
-        rutaGlobal.push(...rutaCoords)
-        const color = coloresPorPiso[piso] || "#000000"
-        const poly = L.polyline(rutaCoords, { color, weight: 6, opacity: 0.9 }).addTo(map)
-        rutasDibujadas.push(poly)
-
-        // 🧭 Indicaciones por pasillo
-        const pasilloMasCercano = pasillosPiso.reduce((a, b) =>
-          distancia(a.coordenadas[0], nodoInicio) < distancia(b.coordenadas[0], nodoInicio) ? a : b
-        )
-
-        indicaciones.value.push(`> <b>Usa el pasillo:</b> "${pasilloMasCercano.nombres}", en el piso: ${piso}`)
-
-        // 🔹 Insertar referencia más cercana al nodo final del pasillo antes de subir/bajar piso
-   
-
-        // 🧭 Cambio de piso
-        if (i < rutasPisos.value.length - 1) {
-            if (referencias.value.length > 0 && nodoFinal) {
-          const refCercana = referencias.value.reduce((a, b) => {
-            const distA = distancia(a.coordenadas, nodoFinal)
-            const distB = distancia(b.coordenadas, nodoFinal)
-            return distA < distB ? a : b
-          })
-
-          indicaciones.value.push(`><b> Usa la</b> ': ${refCercana.nombres} '`)
-
-          // Agregar marcador en mapa
-          L.marker(refCercana.coordenadas)
-            .addTo(map)
-            .bindPopup(`🪜  ${refCercana.nombres}`)
-        }
-          const proximoPiso = rutasPisos.value[i + 1]
-          const dir = proximoPiso > piso ? "> <b>Sube</b>" : "> <b>Baja<b>"
-          indicaciones.value.push(`${dir} al piso ${proximoPiso}`)
-        }
-
-        origen = nodoFinal
+    // 🔹 Generar indicaciones por referencias (escaleras/elevadores)
+    for (let i = 0; i < rutaCoords.length; i++) {
+      const coord = rutaCoords[i]
+      const ref = referencias.value.find(r => distancia(r.coordenadas, coord) < 1)
+      if (ref && !indicaciones.value.includes(ref.nombres)) {
+        indicaciones.value.push(`Usa referencia: ${ref.nombres}`)
+        const m = L.marker(ref.coordenadas).addTo(map).bindPopup(`🪜 ${ref.nombres}`)
+        marcadoresReferencia.push(m)
       }
     }
 
-    // 🆕 Línea punteada hasta el pasillo más cercano del piso actual
-    const pisoUsuario = parseInt(pisoSeleccionado.value)
-    const pasillosPisoUsuario = pasillos.value.filter(p => p.id_pisos === pisoUsuario)
+    // 🔹 Línea punteada desde ubicación actual al primer nodo del pasillo
+    const puntoInicioRuta = rutaCoords[0]
+    if (rutaSinPasillo.value) map.removeLayer(rutaSinPasillo.value)
+    rutaSinPasillo.value = L.polyline([origenCoords.value, puntoInicioRuta], {
+      color: "black", weight: 2, opacity: 0.8, dashArray: "5,10"
+    }).addTo(map)
 
-    if (pasillosPisoUsuario.length > 0) {
-      const nodosPisoUsuario = generarNodosPasillos(pasillosPisoUsuario).flatMap(p => p.coordenadas)
-      const rutaPisoActual = rutasDibujadas.find((r, idx) => rutasPisos.value[idx] === pisoUsuario)
-      let puntoInicioRuta = null
-
-      if (rutaPisoActual) {
-        const coordsRuta = rutaPisoActual.getLatLngs().map(p => [p.lat, p.lng])
-        puntoInicioRuta = coordsRuta.reduce((a, b) => distancia(a, origenCoords.value) < distancia(b, origenCoords.value) ? a : b)
-      } else {
-        puntoInicioRuta = nodosPisoUsuario.reduce((a, b) => distancia(a, origenCoords.value) < distancia(b, origenCoords.value) ? a : b)
-      }
-
-      if (puntoInicioRuta) {
-        if (rutaSinPasillo.value) map.removeLayer(rutaSinPasillo.value)
-        rutaSinPasillo.value = L.polyline([origenCoords.value, puntoInicioRuta], {
-          color: "black", weight: 2, opacity: 0.8, dashArray: "5,10"
-        }).addTo(map)
-        await nextTick()
-        map.invalidateSize()
-      }
-    }
+    await nextTick()
+    map.invalidateSize()
 
   } catch (e) {
     console.error(e)
     alert("Error calculando ruta")
   }
 }
+
 
 
 // ====== Inicializar mapa ======
