@@ -407,28 +407,56 @@ onMounted(() => {
 
   
 
-  // 🆕 Detectar click sostenido para obtener coordenadas
-  let clickTimer = null
-  let marke = null
-  map.on("mousedown", (e) => {
-    clickTimer = setTimeout(() => {
-      const { lat, lng } = e.latlng
-        marke = L.marker([lat, lng])
-      .addTo(map)
-      .bindPopup(`📍 Coordenadas: ${lat.toFixed(7)},${lng.toFixed(7)}`)
-      .openPopup()
-  }, 600)  // mantener presionado 600ms
-  })
+let marker = null;
+let clickTimer = null;
 
-  map.on("mouseup", () => {
-    clearTimeout(clickTimer)
-  })
-  map.on("dblclick", () => {
-  if (marke) {
-    map.removeLayer(marke)
-    marke = null
+// Detectar si es móvil
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// 🖱️ PC → click derecho
+map.on("contextmenu", (e) => {
+  if (isMobile) return; 
+  placeMarker(e.latlng);
+});
+
+// 📱 Móvil → long press (600ms)
+map.on("touchstart", (e) => {
+  if (!isMobile) return;
+
+  clickTimer = setTimeout(() => {
+    placeMarker(e.latlng);
+  }, 600);
+});
+
+// cancelar si no mantiene presionado
+map.on("touchend", () => clearTimeout(clickTimer));
+map.on("touchmove", () => clearTimeout(clickTimer));
+
+// 🧩 Función para crear o mover marcador
+function placeMarker({ lat, lng }) {
+  if (marker) {
+    marker.setLatLng([lat, lng]);
+    marker.setPopupContent(`📍 Coordenadas: ${lat.toFixed(7)}, ${lng.toFixed(7)}`);
+    marker.openPopup();
+  } else {
+    marker = L.marker([lat, lng])
+      .addTo(map)
+      .bindPopup(`📍 Coordenadas: ${lat.toFixed(7)}, ${lng.toFixed(7)}`)
+      .openPopup();
   }
-})
+}
+
+// 🖱️ PC → cancelar long press si se suelta mouse
+map.on("mouseup", () => clearTimeout(clickTimer));
+
+// 🗑️ Doble click → borrar marcador (si quieres esta función)
+map.on("dblclick", () => {
+  if (marker) {
+    map.removeLayer(marker);
+    marker = null;
+  }
+});
+
 })
 
 watch(

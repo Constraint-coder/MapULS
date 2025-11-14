@@ -18,11 +18,11 @@
     <!-- 🔻 Contenido colapsable -->
     <transition name="fade">
       <div v-if="mostrarPanel" class="mt-6 space-y-3">
-      <vs-button block color="dark" @click="toggle('destino')">📍 Destino</vs-button>
+      <vs-button block color="success" @click="toggle('destino')">📍 Destino</vs-button>
       <vs-button block  color="success" @click="toggle('pasillos')">🛣️ Pasillos</vs-button>
-      <vs-button block color="warn" @click="toggle('referencia')">📌 Referencia</vs-button>
-      <vs-button block color="danger" @click="toggle('pisos')">🏢 Pisos</vs-button>
-      <vs-button block color="dark" @click="toggle('materias')">📕 Materias</vs-button>
+      <vs-button block color="success" @click="toggle('referencia')">📌 Referencia</vs-button>
+      <vs-button block color="success" @click="toggle('pisos')">🏢 Pisos</vs-button>
+      <vs-button block color="success" @click="toggle('materias')">📕 Materias</vs-button>
 
         <!-- Formularios -->
         <div class="mt-6 space-y-6">
