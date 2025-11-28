@@ -45,6 +45,15 @@
           required
         />
 
+<input 
+  type="file" 
+  accept="image/*" 
+  @change="form.imagen = $event.target.files[0]" 
+  class="mt-2"
+/>
+
+
+
         <!-- BOTÓN -->
         <vs-button block color="success" class="mt-4" @click="guardarDestino">
           Guardar Destino
@@ -62,6 +71,7 @@
             <vs-th>Nombre</vs-th>
             <vs-th>Piso</vs-th>
             <vs-th>Coordenadas</vs-th>
+            <vs-th>Imagen</vs-th>
             <vs-th>Acciones</vs-th>
           </vs-tr>
         </template>
@@ -71,7 +81,14 @@
             <vs-td>{{ dest.nombres }}</vs-td>
             <vs-td>{{ dest.piso?.nombres ?? '—' }}</vs-td>
             <vs-td>{{ Array.isArray(dest.coordenadas) ? dest.coordenadas.join(', ') : '—' }}</vs-td>
-            <vs-td>
+             <vs-td>
+              <img 
+                v-if="dest.imagen" 
+                :src="backendURL + dest.imagen" 
+                class="w-16 h-16 object-cover rounded"
+              />
+
+            </vs-td><vs-td>
               <vs-button color="warning" small @click="editar(dest)">Editar</vs-button>
               <vs-button color="danger" small @click="confirmarEliminar(dest.id)">Eliminar</vs-button>
             </vs-td>
@@ -92,7 +109,6 @@ import {
   editarDestino,
   eliminarDestino
 } from '@/services/destinoServices'
-
 import { getPisos } from '@/services/pisosServices'
 
 const pisos = ref([])
@@ -106,92 +122,93 @@ const editandoId = ref(null)
 const form = ref({
   nombres: '',
   id_pisos: '',
-  coordenadas: ''
+  coordenadas: [],  // siempre array
+  imagen: null,     // null o File
 })
 
+const backendURL = 'http://localhost:8000'
+
+// Cargar pisos y destinos al montar
 onMounted(async () => {
   pisos.value = await getPisos()
+  await cargarDestinos()
 })
 
-/* ============================
-      CARGAR LISTA DE DESTINOS
-=============================*/
+// Cargar lista de destinos
 const cargarDestinos = async () => {
   destinos.value = await getDestino()
 }
 
-/* ============================
-      GUARDAR O EDITAR DESTINO
-=============================*/
+// Guardar o editar destino usando FormData siempre
 const guardarDestino = async () => {
   try {
-    // Convertir coordenadas
-    const coordsTransformadas = form.value.coordenadas
-      .trim()
-      .split(',')
-      .map(Number)
+    const coords = Array.isArray(form.value.coordenadas)
+      ? form.value.coordenadas
+      : form.value.coordenadas.trim().split(',').map(Number)
 
-    if (coordsTransformadas.length !== 2 || coordsTransformadas.some(isNaN)) {
+    if (coords.length !== 2 || coords.some(isNaN)) {
       alert('Formato de coordenadas inválido. Usa: latitud,longitud')
       return
     }
 
-    const payload = {
-      nombres: form.value.nombres,
-      id_pisos: form.value.id_pisos,
-      coordenadas: coordsTransformadas
+    const payload = new FormData()
+    payload.append('nombres', form.value.nombres)
+    payload.append('id_pisos', form.value.id_pisos)
+    coords.forEach(c => payload.append('coordenadas[]', c))
+
+    // ⚡ Solo agregar imagen si es un File
+    if (form.value.imagen instanceof File) {
+      payload.append('imagen', form.value.imagen)
     }
 
     if (editandoId.value) {
-      // 🔄 EDITAR
+      // PATCH
       await editarDestino(editandoId.value, payload)
       alert('Destino actualizado correctamente')
     } else {
-      // ➕ CREAR
       await crearDestino(payload)
       alert('Destino registrado correctamente')
     }
 
-    // Reset
-    form.value = { nombres: '', id_pisos: '', coordenadas: '' }
+    form.value = { nombres: '', id_pisos: '', coordenadas: [], imagen: null }
     editandoId.value = null
-
-    // Recargar lista
-    cargarDestinos()
-    mostrarTabla.value = true
+    await cargarDestinos()
     mostrarFormulario.value = false
+    mostrarTabla.value = true
 
   } catch (error) {
     console.error('Error al guardar destino:', error)
-    alert('Error al guardar destino')
+    if (error.errors) {
+      alert(Object.values(error.errors).flat().join('\n'))
+    } else {
+      alert('Error al guardar destino')
+    }
   }
 }
 
-/* ============================
-      CARGAR DATOS EN FORM AL EDITAR
-=============================*/
+// Editar destino: no enviamos imagen existente como File
 const editar = (dest) => {
   editandoId.value = dest.id
   form.value = {
     nombres: dest.nombres,
     id_pisos: dest.id_pisos,
-    coordenadas: dest.coordenadas.join(',')
+    coordenadas: dest.coordenadas, // mantener array
+    imagen: null,                  // no enviar la ruta existente
   }
 
   mostrarFormulario.value = true
   mostrarTabla.value = false
 }
 
-/* ============================
-      CONFIRMAR ELIMINACIÓN
-=============================*/
+// Confirmar eliminación
 const confirmarEliminar = async (id) => {
   if (confirm('¿Seguro que deseas eliminar este destino?')) {
     await eliminarDestino(id)
-    cargarDestinos()
+    await cargarDestinos()
   }
 }
 </script>
+
 
 <style scoped>
 table {

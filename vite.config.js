@@ -10,6 +10,7 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+   
   optimizeDeps: {
     include: ['vuesax-alpha']},
   resolve: {

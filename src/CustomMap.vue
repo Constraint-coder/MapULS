@@ -1,76 +1,210 @@
 <template>
-       
-  <div class="map-container">
+  <div class="w-full min-h-screen">
 
-    <vs-button 
-        color="dark"
-        @click="regresarAulas"
-        class="mb-4 px-4 py-2"
-      >
-        ← Volver a Aulas
-      </vs-button>
+    <div class="fixed top-0 left-0 right-0 z-[2000] 
+             
+            px-4 py-3"> 
+        <div class="w-[75%] flex items-center justify-between pt-10 h-10 mt-3 pb-5 gap-2 flex-grow">
+            <div class="flex items-center gap-3 flex-grow">
+            <vs-button 
+              color="dark"
+              @click="regresarAulas"
+              class="m-4 px-4 py-2 bg-gray-800 text-white rounded-lg shadow hover:bg-gray-900 flex items-center"
+            >
+              <!-- Solo icono en pantallas pequeñas -->
+              <span class="sm:hidden">←</span>
+              
+              <!-- Texto + icono en pantallas medianas en adelante -->
+              <span class="hidden sm:inline">← Volver a Aulas</span>
+            </vs-button>
+              <div class="w-4 flex flex-grow justify-center items-end">
+              <h3 class="sm:text-5xl text-2xl font-bold text-orange-600  bg-gray-600/50 ">Mapa ULS</h3>
+              </div>
+                <div v-if="cargandoUbicacion" class="justify-center items-center z-[1000]">
+                <div class="w-4 h-4 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-sm text-gray-600 mt-3">ubicación...</p>
+              </div>
+            </div>
 
-      
-    <h3>Mapa ULS</h3>
-        <div class="container-selector"> 
+            <div class="w-[20%]z-[1000] top-4 right-1">
+              <Menu v-if="auth.isAdmin" />
+            </div>
+
+          </div>
 
 
-           <!-- Mostrar Menu solo si el usuario está logueado -->
 
-         
-          <Menu v-if="auth.isAdmin" />
+    <!-- Contenedor principal de selectores -->
+        <div class="space-y-4">
 
-          
-            
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        <!-- selectores para destino y ubicacion de piso -->
-        <div class="container-selector">
-              <!-- 🔹 Buscador de destino -->
-            
-            <div class="selector destino">
-              <label for="destino">Destino:</label>
-              <select id="destino" v-model="destinoSeleccionado" @change="onDestinoChange">
+            <!-- Selector Destino -->
+            <div class="flex flex-col">
+              <label for="destino" class="font-medium mb-1">Destino:</label>
+              <select id="destino" v-model="destinoSeleccionado"
+                class="border rounded-lg px-3 py-2 bg-gray-50 focus:ring focus:ring-blue-300">
                 <option disabled value="">-- Selecciona Destino --</option>
                 <option v-for="dest in destinos" :key="dest.id" :value="dest.id">
-                {{ dest.nombres }}
+                  {{ dest.nombres }}
                 </option>
               </select>
             </div>
 
-            <!-- 🔹 Selector de piso -->
-            <div class="selector piso">
-              <label for="piso">Piso actual:</label>
-                <select v-model="pisoSeleccionado" @change="onDestinoChange">
+            <!-- Selector Piso -->
+            <div class="flex flex-col">
+              <label for="piso" class="font-medium mb-1">Piso actual:</label>
+              <select v-model="pisoSeleccionado"
+                class="border rounded-lg px-3 py-2 bg-gray-50 focus:ring focus:ring-blue-300">
                 <option disabled value="">-- Selecciona Piso --</option>
                 <option v-for="piso in pisos" :key="piso.id" :value="piso.id">
                   {{ piso.nombres }}
                 </option>
               </select>
             </div>
+
+            <!-- Botón Buscar -->
+            <div class="flex items-end">
+              <button @click="encontrar"
+                class="w-auto p-2 bg-blue-600 text-white py-2 rounded-lg shadow hover:bg-blue-700">
+                🔍 Buscar
+              </button>
+              
+            </div>
+            
           </div>
         </div>
-   
-    <!--     aqui empieza el contenedor con el mapa y boton de ubicacion actual, mas cuadro de indicaciones -->
 
-    <!-- 🗺️ Mapa -->
+          <!-- Botón actualizar ubicación -->
+        <div class="z-[2000] flex justify-start mb--3">
+          <button 
+            @click="iniciarGeolocalizacion"
+            class="px-6 py-2 rounded-lg shadow hover:bg-green-700">
+            🔄
+          </button>
+        </div>
+    </div>
+    <!-- Mapa -->
     <div id="map" ref="mapElement"></div>
 
-    <!-- 🔹 Botón para actualizar ubicación -->
-    <div class="selector actualizar">
-      <button @click="iniciarGeolocalizacion" class="btn-geo">
-        🔄 Actualizar mi ubicación
-      </button>
+    <!-- Pestaña  Imagen -->
+    <div>
+        <!-- Pestaña Imagen fija abajo -->
+        <div v-if="destinoImagen"
+          class="fixed bottom-0 right-0 
+         z-[1200] flex flex-col items-center">
+
+          <!-- Botón -->
+          <button
+            @click="expandida = !expandida"
+            class="bg-blue-600 text-white px-3 py-1 rounded-t-lg shadow-lg focus:outline-none"
+          >
+            Ver Imagen de Destino
+          </button>
+
+          <!-- Contenido expandible -->
+          <div
+                v-show="expandida"
+                class="p-2 m-4 rounded-b-lg shadow-lg 
+                      w-40 sm:w-48 md:w-56 lg:w-64 xl:w-72
+                      flex justify-center items-center bg-white
+                      transition-all duration-300"
+              >
+                <img
+                  :src="backendURL + (destinoImagen || '/img/default.png')"
+                  alt="Destino"
+                  class="w-full max-h-72 object-contain rounded"
+                />
+              </div>
+
+        </div>
+
+
+        <!-- Indicaciones -->
+        <div
+          v-if="indicaciones.length > 0"
+          class="fixed bottom-2 left-4 z-[1100] bg-white p-4 rounded-xl shadow-lg w-auto sm:w-[50%] md:w-[45%]"
+        >
+          <!-- Botón para expandir/colapsar -->
+          <button
+            @click="expandeIndicacion = !expandeIndicacion"
+            class="mb-2 text-lg text-blue-600 hover:underline"
+          >
+            {{ expandeIndicacion ? 'Ocultar' : 'Indicaciones' }}
+          </button>
+
+          <!-- Contenedor del listado -->
+          <div
+            :class="expandeIndicacion ? 'max-h-0 overflow-hidden' : 'max-h-60 overflow-y-auto'"
+            class="transition-all duration-300"
+          >
+            <h4 class="text-xl font-semibold mb-2">🧭 Indicaciones</h4>
+
+            <!-- Lista de indicaciones -->
+            <ul class="list-disc ml-6 space-y-1 w-full">
+              <li v-for="(ind, i) in indicaciones" :key="i" class="w-full" v-html="ind"></li>
+            </ul>
+          </div>
+        </div>
+
     </div>
 
-    
 
-    <!-- 🆕 Listado de indicaciones -->
-    <div class="selector indicaciones" v-if="indicaciones.length > 0">
-      <h4>🧭 Indicaciones</h4>
-      <ul>
-        <li v-for="(ind, i) in indicaciones" :key="i" v-html="ind"></li>
-      </ul>
+    <!-- Modal -->
+    <transition name="modal-fade">
+      <div v-if="mostrarModal"
+        class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[2100]">
+
+        <div class="bg-white w-80 p-6 rounded-xl shadow-lg space-y-4">
+          <p class="text-center text-lg font-semibold" v-if="encontrado">
+            {{ encontrado.nombres }}
+          </p>
+
+          <!-- Radios -->
+          <div class="space-y-2">
+            <label class="flex items-center gap-2">
+              <input type="radio" value="actual" v-model="ubicacionSeleccionada" />
+              <span>Ubicación actual</span>
+            </label>
+
+            <label class="flex items-center gap-2">
+              <input type="radio" value="mapa" v-model="ubicacionSeleccionada" />
+              <span>Ubicación desde mapa</span>
+            </label>
+          </div>
+
+          <!-- Botones modal -->
+          <div class="flex justify-between pt-2">
+            <button 
+              @click="SeleccionarUbicacion"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              ➤ Comenzar
+            </button>
+
+            <button 
+              @click="cerrarModal"
+              class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+              ✖ Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Marcador flotante -->
+    <div v-if="modoMapaActivo" class="text-3xl fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+      📍
     </div>
+
+    <!-- Aceptar ubicación -->
+    <button 
+      v-if="modoMapaActivo"
+      @click="confirmarUbicacionMapa"
+      class="fixed bottom-6 right-6 bg-blue-600 text-white px-5 py-3 rounded-full shadow-lg hover:bg-blue-700">
+      ✔ Aceptar ubicación
+    </button>
+
+
   </div>
 </template>
 
@@ -80,7 +214,7 @@ import L, { marker } from "leaflet"
 import "leaflet/dist/leaflet.css"
 import "leaflet-imageoverlay-rotated"
 import { getPasillo } from "./services/pasillosServices"
-import { getDestino, getDestinoById } from "./services/destinoServices"
+import { getDestino, getDestinoById,getDestinoByI } from "./services/destinoServices"
 import { getPisos } from "./services/pisosServices"
 import { getReferencia } from "./services/puntoServices"
 import { useDestinoStore } from '@/stores/useDestinoStore'
@@ -91,17 +225,19 @@ import { useRouter } from "vue-router"
 const router = useRouter()
 
 
+const backendURL = 'http://localhost:8000'
+
 // ====== Refs ======
 const store = useDestinoStore()  // trae consigo el aula seleccionada
 
-function regresarAulas() {
-  store.setDestinoSeleccionado('') // limpia el aula seleccionada
-   router.push('/dashboard')
-  
-}
+// Radio button
+const ubicacionSeleccionada = ref('actual') // valor por defecto
+const expandida = ref(false); //expander para imagen
+const expandeIndicacion = ref(false) //expander para indicacion
 
 const auth = useAuthStore()  /// detecta el lgueado
 
+let destinoImagen = ""
 const mapElement = ref(null)
 const destinos = ref([])
 const referencias = ref([])
@@ -112,17 +248,161 @@ const pasillos = ref([])
 const rutasPisos = ref([])
 const logPasillosUsados = ref([])
 const indicaciones = ref([]) // 🆕 Listado de instrucciones
+ const encontrado =ref("")
+
 
 // 🆕 Variables reactivas
 const origenCoords = ref(null)
+ const CorrdsControl = ref(null)
 const rutaSinPasillo = ref(null) // línea punteada reactiva
+const modoMapaActivo = ref(false);
+const cargandoUbicacion = ref(false);
+
 
 let map
 let marcadorDestino = null
 let marcadorUsuario = null
 let rutasDibujadas = []
 let marcadoresReferencia = []
+
+let marcadorMapa = null;
+
 const GROSOR_PASILLOS = 10
+
+
+const mostrarModal = ref(false); 
+  // 🔥 Variable reactiva para manejo del modal
+
+
+
+  function regresarAulas() {
+  store.setDestinoSeleccionado('') // limpia el aula seleccionada
+   router.push('/dashboard')
+  
+}
+
+const encontrar = async () => {
+
+  rutasPisos.value = [];
+  logPasillosUsados.value = [];
+  indicaciones.value = [];
+  marcadoresReferencia.forEach(m => map.removeLayer(m));
+  marcadoresReferencia = [];
+
+  // VALIDACIONES BÁSICAS
+  if (!pisoSeleccionado.value) {
+    alert("Selecciona tu piso actual");
+    return;
+  }
+
+  if (!destinoSeleccionado.value) {
+    alert("Selecciona Destino...");
+    return;
+  }
+
+  try {
+    // 🔹 Verificar si existe el destino
+    const destino = await getDestinoById(destinoSeleccionado.value);
+
+    if (!destino) {
+      alert("Destino no encontrado");
+      return;
+    }
+        const todos = destinos.value.flat();
+    const encuentra = todos.find(d => d.id === destinoSeleccionado.value); 
+    encontrado.value = encuentra.nombres;
+    // 👉 SI TODO ES CORRECTO => ABRIR MODAL
+    mostrarModal.value = true;
+
+  } catch (e) {
+    console.error(e);
+    alert("Error validando ruta");
+  }
+};    // 👉 Abrir modal
+
+const cerrarModal = () => {
+  mostrarModal.value = false;     // 👉 Cerrar modal
+};
+
+function confirmarUbicacionMapa() {
+    // Tomar coordenadas del centro del mapa
+    const center = map.getCenter();
+    const lat = center.lat;
+    const lng = center.lng;
+
+    // Guardar como origen
+    origenCoords.value = [lat, lng];
+
+   CorrdsControl.value = [...origenCoords.value] 
+
+    // Crear un marcador fijo en esa posición
+    marcadorMapa = L.marker([lat, lng])
+      .addTo(map)
+      .bindPopup("📍 Punto seleccionado")
+      .openPopup();
+
+    modoMapaActivo.value = false; // salir del modo mapa
+
+    console.log("Coordenadas elegidas:", origenCoords.value);
+
+    onDestinoChange(); // Calcular la ruta
+
+}
+
+
+function SeleccionarUbicacion() {
+  // Cerrar modal
+  mostrarModal.value = false;
+
+  // 👉 OPCIÓN 1: Usar ubicación actual del celular
+  if (ubicacionSeleccionada.value === 'actual') {
+
+   if (marcadorMapa) {
+  map.removeLayer(marcadorMapa);
+  marcadorMapa = null; // opcional, para limpiar la referencia
+}
+    
+if (CorrdsControl.value && origenCoords.value) {
+  const iguales =
+    CorrdsControl.value[0] === origenCoords.value[0] &&
+    CorrdsControl.value[1] === origenCoords.value[1];
+
+  if (iguales) {
+    alert("Buscando ubicación GPS");
+    return;
+  }
+}
+    iniciarGeolocalizacion();
+
+    if (!origenCoords.value) {
+      alert("No se detecta tu ubicación actual aún.");
+      return;
+    }
+    console.log("Ruta desde GPS:", origenCoords.value);
+    onDestinoChange();
+    return;
+  }
+
+  // 👉 OPCIÓN 2: Usar ubicación desde mapa
+if (ubicacionSeleccionada.value === "mapa") {
+    mostrarModal.value = false;  
+
+    // Activar modo mapa
+    modoMapaActivo.value = true;
+
+    // Si existe un marcador anterior, eliminarlo
+    if (marcadorMapa) {
+        map.removeLayer(marcadorMapa);
+        marcadorMapa = null;
+    }
+
+    // En este modo NO se crea marcador, solo flotante
+    return;
+}
+
+}
+
+
 
 // ====== Utilidades ======
 function distancia(a, b) {
@@ -211,12 +491,21 @@ cargarDatos()
 
 // ====== Geolocalización ======
 function iniciarGeolocalizacion(){
-  if(!navigator.geolocation){ alert("Tu navegador no soporta geolocalización"); return }
+  
+  if(!navigator.geolocation){ alert("Tu navegador no soporta geolocalización");
+   return 
+  }
+      cargandoUbicacion.value = true;
+  
+
   navigator.geolocation.watchPosition(
     pos=>{
       const coords=[pos.coords.latitude,pos.coords.longitude]
-      origenCoords.value = coords
-     
+
+      origenCoords.value = coords // aca le asigno las coordenadas a origencoords
+         if (coords !=null){
+      cargandoUbicacion.value = false;
+    }
       if(!marcadorUsuario){
         marcadorUsuario=L.marker(coords).addTo(map).bindPopup("📍 Tú estás aquí")
       } else marcadorUsuario.setLatLng(coords)
@@ -239,6 +528,7 @@ async function onDestinoChange() {
 
   try {
     const destino = await getDestinoById(destinoSeleccionado.value)
+    destinoImagen=destino.imagen
     if (!destino) { alert("Destino no encontrado"); return }
 
     const pisoActual = parseInt(pisoSeleccionado.value)
@@ -390,6 +680,7 @@ async function onDestinoChange() {
 
 // ====== Inicializar mapa ======
 onMounted(() => {
+
   iniciarGeolocalizacion()
  auth.fetchUser()
 
@@ -483,174 +774,11 @@ watch(
 
 
 <style scoped>
-.container-selector{
-  margin-top: 5px;
- 
-  display: flex;
-  padding: 5px;
-  height: auto;
-  border: 2px solid #0056b3 ;
-}
-
-.selector.destino{
-  margin: 5px;
-}
-.selector.piso{
-  margin: 5px;
-}
-.selector.indicaciones {
-  position:absolute ;
-  bottom: 1px;
-  left: 10px;
-  max-width: 300px;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #ccc;
-  font-size: 14px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.selector.indicaciones h4 {
-  margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: bold;
-}
-
-.selector.indicaciones ul {
-  list-style-type: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.selector.indicaciones li {
-  margin-bottom: 4px;
-  line-height: 1.3;
-}
-
-.map-container {
-  height: 90vh;
-  width: 100%;
-  position: absolute;
-  font-family: Arial, sans-serif;
-  border: 2px solid aqua;
-}
-
-h3 {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1100;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 6px 12px;
-  border-radius: 8px;
-  box-shadow: 0 0 6px rgba(0,0,0,0.3);
-  font-size: 18px;
-}
-
 #map {
-  height: 70vh;
+  height: 100vh;
   width: 100%;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 2px solid #031770;
   z-index: 0;
 }
-
-/* 🔹 Selectores flotantes */
-
-/* Posiciones específicas */
-
-/* Estilo de select */
-select {
-  margin-left: 6px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-}
-
-/* Botón de geolocalización */
-.btn-geo {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-}
-
-.btn-geo:hover {
-  background-color: #0056b3;
-}
-
-/* 🔹 Responsive - Pantallas medianas (tablets) */
-
-
-/* 🔹 Responsive - Pantallas pequeñas (móviles) */
-@media (max-width: 768px) {
-
-.container-selector{
-  font-size: 12px;
-  
-}
-  .selector.actualizar {
-    top: auto;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    width: calc(100% - 20px);
-    margin-bottom: 8px;
-    font-size: 12px;
-    padding: 6px 10px;
-    display:block;
-  }
-  h3 {
-    font-size: 12px;
-    padding: 3px 6px;
-  }
-  .selector.destino{
-    margin-right: 15px;
-    width: 30%;
-    font-size: 12px;
-
-  }
-  .selector.piso{
-    margin-right: 15px;
-    width: 30%;
-    font-size: 12px;
-  }
-}
-@media (max-width: 468px) {
-
-.container-selector{
-  font-size: 12px;
-    display: block;
-}
-  .selector.actualizar {
-    top: auto;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    width: calc(100% - 20px);
-    margin-bottom: 8px;
-    font-size: 12px;
-    padding: 6px 10px;
-    display:block;
-  }
-  h3 {
-    font-size: 12px;
-    padding: 3px 6px;
-  }
-  .selector.destino{
-    width: 30%;
-    font-size: 12px;
-
-  }
-  .selector.piso{
-    width: 30%;
-    font-size: 12px;
-  }
-}
-
 </style>
